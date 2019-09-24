@@ -3,6 +3,14 @@ name = "sshish"
 version = "0.1.0"
 authors = ["Jane Lusby <jlusby@yaah.dev>"]
 edition = "2018"
+description = """
+A std::process::Command-like api for running commands via libssh2
+"""
+license = "MIT"
+keywords = ["ssh", "process", "command"]
+readme = "README.md"
+repository = "https://github.com/yaahc/sshish"
+documentation = "https://docs.rs/sshish"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
