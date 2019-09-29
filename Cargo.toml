@@ -15,4 +15,3 @@ documentation = "https://docs.rs/sshish"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ssh2 = "0.4.0"

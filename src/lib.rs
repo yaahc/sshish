@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::process::Child;
@@ -7,25 +8,47 @@ use std::process::Stdio;
 
 type Result<T> = std::result::Result<T, std::io::Error>;
 
-pub struct Session {
-    host: OsString,
+pub struct PreCommand {
+    cmd: OsString,
+    port: u16,
 }
 
-impl Session {
-    pub fn new(host: impl AsRef<OsStr>) -> Self {
-        Self {
-            host: host.as_ref().into(),
+pub struct Command {
+    ssh: std::process::Command,
+    cmd: OsString,
+    cwd: Option<OsString>,
+    args: Vec<OsString>,
+    envs: BTreeMap<OsString, Option<OsString>>,
+}
+
+impl PreCommand {
+    pub fn port(self, port: u16) -> Self {
+        Self { port, ..self }
+    }
+
+    pub fn host<S: AsRef<OsStr>>(self, host: S) -> Command {
+        let mut cmd = std::process::Command::new("ssh");
+        cmd.arg(host);
+
+        Command {
+            ssh: cmd,
+            cmd: self.cmd,
+            cwd: None,
+            args: vec![],
+            envs: BTreeMap::new(),
+        }
+    }
+}
+
+impl Command {
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new<S: AsRef<OsStr>>(program: S) -> PreCommand {
+        PreCommand {
+            cmd: program.as_ref().into(),
+            port: 22,
         }
     }
 
-    pub fn command(cmd: impl AsRef<OsStr>) -> Command {
-        unimplemented!()
-    }
-}
-
-pub struct Command;
-
-impl Command {
     pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Self {
         unimplemented!()
     }
@@ -68,27 +91,75 @@ impl Command {
     }
 
     pub fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
-        unimplemented!()
+        self.ssh.stdin(cfg);
+
+        self
     }
 
     pub fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
-        unimplemented!()
+        self.ssh.stdout(cfg);
+
+        self
     }
 
     pub fn stderr<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
-        unimplemented!()
+        self.ssh.stderr(cfg);
+
+        self
     }
 
     pub fn spawn(&mut self) -> Result<Child> {
-        unimplemented!()
+        self.apply_envs();
+        self.apply_args();
+
+        self.ssh.spawn()
     }
 
+    /// Blah
+    ///
+    /// ```
+    /// use std::io::{self, Write};
+    ///
+    /// let output = sshish::Command::new("ls")
+    ///                  .host("localhost")
+    ///                  .output()
+    ///                  .unwrap();
+    ///
+    /// println!("status: {}", output.status);
+    ///
+    /// assert!(!output.stdout.is_empty());
+    /// assert!(output.stderr.is_empty());
+    ///
+    /// io::stdout().write_all(&output.stdout).unwrap();
+    /// io::stderr().write_all(&output.stderr).unwrap();
+    ///
+    /// assert!(output.status.success());
+    /// ```
     pub fn output(&mut self) -> Result<Output> {
-        unimplemented!()
+        self.apply_envs();
+        self.apply_args();
+
+        self.ssh.output()
     }
 
     pub fn status(&mut self) -> Result<ExitStatus> {
-        unimplemented!()
+        self.apply_envs();
+        self.apply_args();
+
+        self.ssh.status()
+    }
+
+    fn apply_envs(&mut self) {
+        for (key, value) in &mut self.envs {
+            unimplemented!()
+        }
+    }
+
+    fn apply_args(&mut self) {
+        self.ssh.arg(self.cmd.as_os_str());
+        for arg in &mut self.args {
+            unimplemented!()
+        }
     }
 }
 
