@@ -50,7 +50,9 @@ impl Command {
     }
 
     pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Self {
-        unimplemented!()
+        self.args.push(arg.as_ref().to_os_string());
+
+        self
     }
 
     pub fn args<I, S>(&mut self, args: I) -> &mut Self
@@ -58,7 +60,11 @@ impl Command {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        unimplemented!()
+        for arg in args {
+            self.arg(arg);
+        }
+
+        self
     }
 
     pub fn env<K, V>(&mut self, key: K, val: V) -> &mut Self
@@ -66,7 +72,12 @@ impl Command {
         K: AsRef<OsStr>,
         V: AsRef<OsStr>,
     {
-        unimplemented!()
+        self.envs.insert(
+            key.as_ref().to_os_string(),
+            Some(val.as_ref().to_os_string()),
+        );
+
+        self
     }
 
     pub fn envs<I, K, V>(&mut self, vars: I) -> &mut Self
@@ -75,7 +86,11 @@ impl Command {
         K: AsRef<OsStr>,
         V: AsRef<OsStr>,
     {
-        unimplemented!()
+        for (key, val) in vars {
+            self.env(key, val);
+        }
+
+        self
     }
 
     pub fn env_remove<K: AsRef<OsStr>>(&mut self, key: K) -> &mut Self {
@@ -87,7 +102,9 @@ impl Command {
     }
 
     pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Command {
-        unimplemented!()
+        self.cwd = Some(dir.as_ref().as_os_str().to_os_string());
+
+        self
     }
 
     pub fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
@@ -150,23 +167,75 @@ impl Command {
     }
 
     fn apply_envs(&mut self) {
+        if let Some(dir) = &self.cwd {
+            self.ssh.arg("cd").arg(dir).arg("&&");
+        }
+
         for (key, value) in &mut self.envs {
-            unimplemented!()
+            let key = key.to_string_lossy();
+            let value = shell_escape::escape(value.as_ref().unwrap().to_string_lossy());
+            let arg = format!("{}={}", key, value);
+            self.ssh.arg(arg);
         }
     }
 
     fn apply_args(&mut self) {
         self.ssh.arg(self.cmd.as_os_str());
         for arg in &mut self.args {
-            unimplemented!()
+            let escaped_arg = shell_escape::escape(arg.to_string_lossy());
+            self.ssh.arg(escaped_arg.as_ref());
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn test_arg_splitting() {
+        let output = Command::new("./tests/countargs.sh")
+            .host("localhost")
+            .current_dir(std::env::current_dir().unwrap())
+            .arg("hi")
+            .arg(r#"hello what is up"#)
+            .output()
+            .unwrap();
+
+        let output_str = std::str::from_utf8(&output.stdout).unwrap();
+        println!("{}", output_str);
+        assert_eq!(output_str.trim(), "2");
+    }
+
+    #[test]
+    fn test_env_variables() {
+        let val = "whatever it doesn't matter what I put here";
+        let output = Command::new("bash")
+            .host("localhost")
+            .env("hihello", val)
+            .arg("-c")
+            .arg("echo $hihello")
+            .output()
+            .unwrap();
+
+        let output_str = std::str::from_utf8(&output.stdout).unwrap();
+        println!("{}", output_str);
+        assert_eq!(output_str.trim(), val);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_env_variables_wrongly() {
+        let val = "whatever it doesn't matter what I put here";
+        let output = Command::new("echo")
+            .host("localhost")
+            .env("hihello", val)
+            .arg("$hihello")
+            .output()
+            .unwrap();
+
+        let output_str = std::str::from_utf8(&output.stdout).unwrap();
+        println!("{}", output_str);
+        assert_eq!(output_str.trim(), val);
     }
 }
